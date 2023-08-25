@@ -1,0 +1,85 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    signingConfigs {
+        release {
+            storeFile file('platform.keystore')
+            storePassword 'android'
+            keyAlias = 'quectel'
+            keyPassword 'android'
+        }
+    }
+    compileSdkVersion 33
+    buildToolsVersion "33.0.0"
+
+    defaultConfig {
+        applicationId "com.quectel.permissionmanager"
+        minSdkVersion 25
+        targetSdkVersion 33
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        debug
+                {
+                    signingConfig signingConfigs.release
+                }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    namespace 'com.quectel.permissionmanager'
+}
+
+dependencies {
+    //We only use framework.jar to compile the source code,framework.jar is not included in apk file.
+    compileOnly files('libs/framework.jar')
+
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'com.google.android.material:material:1.2.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.1'
+    testImplementation 'junit:junit:4.+'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+}
+
+//The following configration is very important for framework.jar
+//begin===================
+gradle.projectsEvaluated {
+    tasks.withType(JavaCompile) {
+        Set<File> fileSet = options.bootstrapClasspath.getFiles();
+        List<File> newFileList = new ArrayList<>()
+        newFileList.add(new File("libs/framework.jar"))
+        newFileList.addAll(fileSet)
+        options.bootstrapClasspath = files(newFileList.toArray())
+    }
+}
+//Prior to use framework.jar
+preBuild {
+    doLast {
+//        def imlFile = file(project.name + ".iml")
+        def imlFile = file("../.idea/modules/app/PermissionManager.iml")
+        println 'Change ' + project.name + '.iml order'
+        try {
+            def parseXml = new XmlParser().parse(imlFile)
+            def jdkNode = parseXml.component[1].orderEntry.find { it.'@type' == 'jdk' }
+            parseXml.component[1].remove(jdkNode)
+            def sdkString = "Android API " + android.compileSdkVersion.substring("android-".length()) + " Platform"
+            new Node(parseXml.component[1], 'orderEntry', ['type': 'jdk', 'jdkName': sdkString, 'jdkType': 'Android SDK'])
+            XmlUtil.serialize(parseXml, new FileOutputStream(imlFile))
+        } catch (FileNotFoundException e) {
+            //nop, iml not found.
+        }
+    }
+}
